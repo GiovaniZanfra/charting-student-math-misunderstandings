@@ -40,6 +40,12 @@ format:
 	ruff format
 
 
+## Test transformer setup
+.PHONY: test-transformer
+test-transformer: requirements
+	$(PYTHON_INTERPRETER) test_transformer_setup.py
+
+
 
 
 
@@ -63,6 +69,30 @@ create_environment:
 .PHONY: data
 data: requirements
 	$(PYTHON_INTERPRETER) charting_student_math_misunderstandings/dataset.py
+
+
+## Generate features (including transformer prompts)
+.PHONY: features
+features: requirements
+	$(PYTHON_INTERPRETER) charting_student_math_misunderstandings/features.py
+
+
+## Train transformer model
+.PHONY: train-transformer
+train-transformer: features
+	$(PYTHON_INTERPRETER) charting_student_math_misunderstandings/modeling/train_transformer.py --exp $(EXP)
+
+
+## Train transformer model with PEFT
+.PHONY: train-transformer-peft
+train-transformer-peft: features
+	$(PYTHON_INTERPRETER) charting_student_math_misunderstandings/modeling/train_transformer.py --exp $(EXP) --use_peft
+
+
+## Generate predictions with transformer model
+.PHONY: predict-transformer
+predict-transformer:
+	$(PYTHON_INTERPRETER) charting_student_math_misunderstandings/modeling/predict_transformer.py --exp $(EXP)
 
 
 #################################################################################
