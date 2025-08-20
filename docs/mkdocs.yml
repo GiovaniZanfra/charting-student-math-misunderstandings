@@ -2,3 +2,10 @@ site_name: charting-student-math-misunderstandings
 # 
 site_author: Giovani Zanfra Brandão
 # 
+
+nav:
+  - Home: index.md
+  - Competition Rules: competition-rules.md
+
+theme:
+  name: material
