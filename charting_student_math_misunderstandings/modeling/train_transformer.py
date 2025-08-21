@@ -111,12 +111,18 @@ def setup_model_and_tokenizer(model_name: str, num_labels: int, use_peft: bool =
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
     
-    # Load model
+    # Load model with GPU optimizations
     model = AutoModelForSequenceClassification.from_pretrained(
         model_name,
         num_labels=num_labels,
         torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+        device_map="auto" if torch.cuda.is_available() else None,
     )
+    
+    # Enable gradient checkpointing for memory efficiency
+    if TRANSFORMER_CONFIG.get('GPU_MEMORY_OPTIMIZATIONS', {}).get('gradient_checkpointing', False):
+        model.gradient_checkpointing_enable()
+        print("✓ Gradient checkpointing enabled for memory efficiency")
     
     # Apply PEFT if requested
     if use_peft:
@@ -150,6 +156,15 @@ def train_transformer(
     batch_size = batch_size or TRANSFORMER_CONFIG['BATCH_SIZE']
     learning_rate = learning_rate or TRANSFORMER_CONFIG['LEARNING_RATE']
     
+    # Check GPU availability
+    if torch.cuda.is_available():
+        gpu_name = torch.cuda.get_device_name(0)
+        gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        print(f"✓ GPU detected: {gpu_name} ({gpu_memory:.1f}GB)")
+        print(f"✓ CUDA version: {torch.version.cuda}")
+    else:
+        print("⚠️  No GPU detected, using CPU (training will be slow)")
+    
     print(f"Training transformer model: {model_name}")
     print(f"Experiment: {exp_name}")
     print(f"PEFT: {use_peft}")
@@ -182,7 +197,7 @@ def train_transformer(
     output_dir = os.path.join(MODELS_DIR, 'transformer', exp_name)
     os.makedirs(output_dir, exist_ok=True)
     
-    # Training arguments
+    # Training arguments with GPU optimizations
     training_args = TrainingArguments(
         output_dir=output_dir,
         num_train_epochs=epochs,
@@ -201,8 +216,11 @@ def train_transformer(
         metric_for_best_model="map3",
         greater_is_better=True,
         save_total_limit=3,
-        dataloader_pin_memory=False,
-        remove_unused_columns=False,
+        # GPU optimizations
+        fp16=TRANSFORMER_CONFIG.get('FP16', True),  # Mixed precision
+        dataloader_pin_memory=TRANSFORMER_CONFIG.get('DATALOADER_PIN_MEMORY', False),
+        remove_unused_columns=TRANSFORMER_CONFIG.get('GPU_MEMORY_OPTIMIZATIONS', {}).get('remove_unused_columns', True),
+        dataloader_num_workers=TRANSFORMER_CONFIG.get('GPU_MEMORY_OPTIMIZATIONS', {}).get('dataloader_num_workers', 2),
         report_to=None,  # Disable wandb/tensorboard
     )
     
